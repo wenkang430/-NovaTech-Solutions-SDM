@@ -1,0 +1,208 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NovaTech | Project Management</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+
+  <section id="loginScreen" class="auth-screen">
+    <div class="auth-brand">
+      <div class="brand-mark nova-symbol" aria-label="NovaTech logo"><svg class="nova-logo-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false"><defs><linearGradient id="novaLine" x1="10" y1="8" x2="56" y2="55" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#B9F5FF"/></linearGradient></defs><path d="M15 46V18L49 46V18" stroke="url(#novaLine)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12H22M42 52H54" stroke="#7EE5DD" stroke-width="3" stroke-linecap="round"/><circle cx="49" cy="18" r="4.5" fill="#7EE5DD"/><circle cx="15" cy="46" r="3" fill="white"/></svg></div>
+      <h1>NovaTech Solutions</h1>
+      <p>IT Project Management System</p>
+      <div class="auth-feature">
+        <h2>One workspace.<br>Every project.</h2>
+        <p>Connect clients, project teams, finance, suppliers and management in one professional platform.</p>
+      </div>
+    </div>
+
+    <div class="auth-panel">
+      <div class="auth-card">
+        <span class="eyebrow">WELCOME BACK</span>
+        <h2>Sign in to your account</h2>
+        <p class="muted">Access your personalized workspace.</p>
+        <form id="loginForm">
+          <label>Email address
+            <input id="loginEmail" type="email" required placeholder="name@company.com">
+          </label>
+          <label>Password
+            <input id="loginPassword" type="password" required placeholder="Enter password">
+          </label>
+          <p id="loginError" class="error"></p>
+          <button class="btn primary full" type="submit">Sign In</button>
+        </form>
+        <p class="auth-switch">Don't have an account?
+          <button id="showRegister" class="text-btn" type="button">Register</button>
+        </p>
+        <div class="demo-box">
+          <strong>Demo accounts</strong>
+          <p>Click a role to autofill. Password: 123456</p>
+          <div id="demoAccounts" class="demo-grid"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="registerScreen" class="auth-screen hidden">
+    <div class="auth-brand">
+      <div class="brand-mark nova-symbol" aria-label="NovaTech logo"><svg class="nova-logo-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false"><defs><linearGradient id="novaLine" x1="10" y1="8" x2="56" y2="55" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#B9F5FF"/></linearGradient></defs><path d="M15 46V18L49 46V18" stroke="url(#novaLine)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12H22M42 52H54" stroke="#7EE5DD" stroke-width="3" stroke-linecap="round"/><circle cx="49" cy="18" r="4.5" fill="#7EE5DD"/><circle cx="15" cy="46" r="3" fill="white"/></svg></div>
+      <h1>NovaTech Solutions</h1>
+      <p>Join our project collaboration platform.</p>
+      <div class="reg-showcase">
+        <div class="reg-live"><span class="reg-live-dot"></span> THE CONNECTED WORKSPACE <span class="reg-live-line"></span> NOVATECH / 2026</div>
+        <h2>Build brilliant things.<br><span>Together.</span></h2>
+        <p class="reg-lead">From the first brief to the final delivery, keep your people, progress and priorities in sync.</p>
+        <div class="reg-preview" aria-label="Project dashboard illustration">
+          <div class="reg-preview-head"><span class="reg-preview-logo">✦</span><span>Project overview</span><span class="reg-preview-dots">•••</span></div>
+          <div class="reg-preview-body">
+            <div class="reg-preview-title"><div><small>FEATURED PROJECT</small><strong>Website Transformation</strong></div><span class="reg-pill">● On track</span></div>
+            <div class="reg-preview-label"><span>Overall progress</span><b>76%</b></div>
+            <div class="reg-preview-track"><span></span></div>
+            <div class="reg-preview-metrics"><div><b>12<span>/16</span></b><small>Tasks completed</small></div><div><b>04</b><small>Milestones</small></div><div><b>08</b><small>Team members</small></div></div>
+            <div class="reg-preview-foot"><span class="reg-avatar">AL</span><span class="reg-avatar">MK</span><span class="reg-avatar">JS</span><span class="reg-preview-foot-label">+5 collaborating</span><span class="reg-mini-chart">▂▃▅▄▆█</span></div>
+          </div>
+        </div>
+        <div class="reg-benefits"><span><i>✓</i> Transparent progress</span><span><i>✓</i> One connected team</span><span><i>✓</i> Faster delivery</span></div>
+      </div>
+    </div>
+    <div class="auth-panel">
+      <div class="auth-card register-card">
+        <button id="registerBackTop" class="register-back" type="button" aria-label="Return to sign in"><span aria-hidden="true">←</span> Back to sign in</button>
+        <span class="eyebrow">CREATE ACCOUNT</span>
+        <h2>Get started</h2>
+        <p class="muted">Clients and external suppliers can register.</p>
+        <form id="registerForm">
+          <label>Full name
+            <input id="regName" required minlength="2">
+          </label>
+          <label>Email address
+            <input id="regEmail" type="email" required>
+          </label>
+          <div class="account-type-field">
+            <span class="account-type-label" id="accountTypeLabel">Account type</span>
+            <select id="regRole" class="visually-hidden-select" aria-labelledby="accountTypeLabel" required tabindex="-1">
+              <option value="client">Client</option>
+              <option value="supplier">External Supplier</option>
+            </select>
+            <div class="account-type-options" role="group" aria-labelledby="accountTypeLabel">
+              <button type="button" class="account-type-option is-selected" data-account-role="client" aria-pressed="true" onclick="chooseNovaAccountType('client')">
+                <span class="account-type-icon" aria-hidden="true">◈</span>
+                <span class="account-type-copy"><strong>Client</strong><small>Start and manage projects</small></span>
+                <span class="account-type-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button" class="account-type-option" data-account-role="supplier" aria-pressed="false" onclick="chooseNovaAccountType('supplier')">
+                <span class="account-type-icon" aria-hidden="true">▦</span>
+                <span class="account-type-copy"><strong>External Supplier</strong><small>Collaborate and deliver services</small></span>
+                <span class="account-type-check" aria-hidden="true">✓</span>
+              </button>
+            </div>
+          </div>
+          <div id="supplierNotice" class="notice hidden">
+            Supplier companies must be approved by the System Administrator.
+          </div>
+          <label>Password (minimum 8 characters)
+            <input id="regPassword" type="password" minlength="8" required>
+          </label>
+          <label>Confirm password
+            <input id="regConfirm" type="password" required>
+          </label>
+          <p id="registerError" class="error"></p>
+          <button class="btn primary full" type="submit">Create Account</button>
+        </form>
+        <p class="auth-switch">Already registered?
+          <button id="backToLogin" class="text-btn" type="button">Sign In</button>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="appScreen" class="app hidden">
+    <div id="mobileOverlay" class="mobile-overlay hidden"></div>
+
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark small-mark nova-symbol" aria-label="NovaTech logo"><svg class="nova-logo-svg" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false"><defs><linearGradient id="novaLine" x1="10" y1="8" x2="56" y2="55" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#B9F5FF"/></linearGradient></defs><path d="M15 46V18L49 46V18" stroke="url(#novaLine)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 12H22M42 52H54" stroke="#7EE5DD" stroke-width="3" stroke-linecap="round"/><circle cx="49" cy="18" r="4.5" fill="#7EE5DD"/><circle cx="15" cy="46" r="3" fill="white"/></svg></div>
+        <div>
+          <strong>NovaTech</strong>
+          <small>PROJECT MANAGEMENT</small>
+        </div>
+      </div>
+      <div class="nav-caption">WORKSPACE</div>
+      <nav id="sideNav"></nav>
+      <div class="sidebar-footer">
+        <div id="sideAvatar" class="avatar"></div>
+        <div class="user-details">
+          <strong id="sideUserName"></strong>
+          <small id="sideUserRole"></small>
+        </div>
+        <button id="logoutBtn" title="Sign out" class="logout-btn">↪</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="top-left">
+          <button id="menuToggle" class="menu-toggle" type="button">☰</button>
+          <span class="breadcrumb">Workspace / <b id="breadcrumbPage">Overview</b></span>
+        </div>
+        <div class="top-right">
+          <span id="todayDate"></span>
+          <div id="topAvatar" class="avatar top-avatar"></div>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <div class="page-header">
+          <div>
+            <span id="pageEyebrow" class="eyebrow">YOUR WORKSPACE</span>
+            <h1 id="pageTitle"></h1>
+            <p id="pageSubtitle"></p>
+          </div>
+          <div id="pageActions" class="page-actions"></div>
+        </div>
+        <div id="pageContent"></div>
+      </div>
+    </main>
+  </section>
+
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="modalTitle"></h2>
+        <button id="closeModal" type="button" class="icon-btn">×</button>
+      </div>
+      <form id="modalForm">
+        <div id="modalBody" class="modal-body"></div>
+        <div class="modal-footer">
+          <button id="cancelModal" type="button" class="btn outline">Cancel</button>
+          <button id="modalSubmit" type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Independent account-type selector: works even when older app.js is cached.
+    function chooseNovaAccountType(value) {
+      if (value !== 'client' && value !== 'supplier') return;
+      const select = document.getElementById('regRole');
+      if (!select) return;
+      select.value = value;
+      document.querySelectorAll('[data-account-role]').forEach(card => {
+        const selected = card.dataset.accountRole === value;
+        card.classList.toggle('is-selected', selected);
+        card.setAttribute('aria-pressed', String(selected));
+      });
+      document.getElementById('supplierNotice')?.classList.toggle('hidden', value !== 'supplier');
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  </script>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
