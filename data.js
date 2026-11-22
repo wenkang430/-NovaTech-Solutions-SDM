@@ -94,6 +94,7 @@ const MENUS = {
     ["reports","System Reports","▥"]
   ]
 };
+for(const entries of Object.values(MENUS))entries.push(["account","Account Settings","⚙"]);
 
 const INITIAL_DATA = {
   users:[

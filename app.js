@@ -424,7 +424,7 @@ function render() {
     </button>`).join("");
 
   const views={
-    settings:renderSettings,schedule:renderSchedule,milestones:renderMilestones,issues:renderIssues,messages:renderMessages,staff:renderStaff,
+    account:renderAccount,settings:renderSettings,schedule:renderSchedule,milestones:renderMilestones,issues:renderIssues,messages:renderMessages,staff:renderStaff,
     overview:renderOverview,notifications:renderNotifications,
     requests:renderRequests,proposals:renderProposals,
     projects:renderProjects,tasks:renderTasks,
@@ -1464,6 +1464,7 @@ function renderRegistration() {
       </div>
       <div class="supplier-hero-status">${badge(s.status)}<small>${esc(statusText)}</small></div>
     </section>
+    ${s.status==="Rejected"&&s.rejectionReason?`<section class="panel" style="padding:18px;margin:16px 0"><h3>Registration rejected — reason</h3><p>${esc(s.rejectionReason)}</p><p>Correct the details and select Resubmit Registration.</p></section>`:""}
     <div class="supplier-metrics">
       <article class="supplier-metric"><div class="supplier-metric-top"><span>Monthly unit rate</span><span class="supplier-metric-icon">RM</span></div><strong>${money(s.rate)}</strong><small>Per ${esc(s.unit).toLowerCase()} / month</small></article>
       <article class="supplier-metric"><div class="supplier-metric-top"><span>Total capacity</span><span class="supplier-metric-icon">▦</span></div><strong>${esc(cap)}</strong><small>${esc(s.unit)} available for allocation</small></article>
@@ -1542,7 +1543,7 @@ function registerSupplier() {
       if(!Number.isInteger(capacity)||capacity<1||n(v.rate)<=0)
         return toast("Invalid rate or capacity.");
       let agreementFile,supportFile;try{agreementFile=await supplierFile(v.agreementFile);supportFile=await supplierFile(v.supportFile);}catch(e){return toast(e.message);}
-      const data={agreementFile,supportFile,reviewedFiles:false,chargeConfirmed:false,serviceChargePercent:null,
+      const data={agreementFile,supportFile,reviewedFiles:false,chargeConfirmed:false,serviceChargePercent:null,rejectionReason:"",
         userId:me.id,company:v.company.trim(),service:v.service,
         unit:v.unit,rate:n(v.rate),capacity,
         agreement:old?.agreement || nextSupplierAgreementReference(),
@@ -1570,7 +1571,8 @@ function renderSuppliers() {
     role("admin")&&s.status==="Pending Approval"?
       `<div class="actions">
       ${btn("Review documents","reviewSupplier",s.id,"outline")} ${btn("Approve","approveSupplier",s.id,"success")}
-      ${btn("Reject","rejectSupplier",s.id,"danger")}</div>`:"—"
+      ${btn("Reject","rejectSupplier",s.id,"danger")}</div>`:
+      role("admin")&&s.status==="Rejected"?`<span title="${esc(s.rejectionReason||"No reason recorded")}">${esc(s.rejectionReason||"No reason recorded")}</span>`:"—"
   ]);
   $("pageContent").innerHTML=panel("Suppliers",
     table(["Company","Service","Unit","Rate","Available / Total",
@@ -1580,13 +1582,21 @@ function decideSupplier(id,approve) {
   if(!role("admin"))return;
   const s=supplier(id);
   if(!s||s.status!=="Pending Approval")return;
-  if(approve&&(!s.agreementFile||!s.supportFile||!s.reviewedFiles||!s.chargeConfirmed))return toast("Review agreement, supporting documents and partnership charge first.");
-  if(!confirm(`${approve?"Approve":"Reject"} supplier?`))return;
-  s.status=approve?"Approved":"Rejected";
-  s.reviewedBy=me.id;
-  notify(s.userId,"Supplier registration reviewed",
-    `${s.company}: ${s.status}.`,"registration");
-  save(`Supplier ${s.status.toLowerCase()}`);
+  if(approve){
+    if(!s.agreementFile||!s.supportFile||!s.reviewedFiles||!s.chargeConfirmed)
+      return toast("Review agreement, supporting documents and partnership charge first.");
+    if(!confirm("Approve supplier?"))return;
+    s.status="Approved";s.rejectionReason="";s.reviewedBy=me.id;
+    notify(s.userId,"Supplier registration approved",`${s.company}: Approved.`,"registration");
+    return save("Supplier approved");
+  }
+  modal("Reject supplier registration",`<p>Supplier: <strong>${esc(s.company)}</strong></p><p>Explain exactly what must be corrected. The supplier will see this reason and can resubmit.</p>${area("Reason for rejection","reason")}`,v=>{
+    const reason=String(v.reason||"").trim();
+    if(reason.length<10)return toast("Provide a specific rejection reason (at least 10 characters).");
+    s.status="Rejected";s.rejectionReason=reason;s.reviewedBy=me.id;
+    notify(s.userId,"Supplier registration rejected",`${s.company}: ${reason}`,"registration");
+    finish("Supplier rejected with reason");
+  },"Reject registration");
 }
 
 /* FINANCE: SUPPLIER BILLING */
@@ -1723,8 +1733,8 @@ function renderUsers() {
     `<strong>${esc(u.name)}</strong><span class="subtext">
     ${esc(u.email)}</span>`,
     esc(ROLES[u.role]),badge(u.active===false?"Inactive":"Active"),
-    u.id===me.id?"Current account":
-      btn(u.active===false?"Enable":"Disable","toggleUser",u.id,"outline")
+    u.id===me.id?btn("Edit","editUser",u.id,"outline"):
+      btn("Edit","editUser",u.id,"outline")+" "+btn(u.active===false?"Enable":"Disable","toggleUser",u.id,"outline")
   ]);
   $("pageContent").innerHTML=panel("Accounts",
     table(["User","Role","Status","Action"],rows));
@@ -1747,6 +1757,45 @@ function newUser() {
       });
       finish("Staff account created");
     });
+}
+function renderAccount(){
+  heading("Account Settings","Manage your own account details and password.",btn("Edit profile","editAccount"));
+  $("pageContent").innerHTML=panel("My account",`<p><strong>Name:</strong> ${esc(me.name)}</p><p><strong>Email:</strong> ${esc(me.email)}</p><p><strong>Role:</strong> ${esc(ROLES[me.role])}</p><p>Changes to your account are saved in this browser's local data.</p>${btn("Edit profile / password","editAccount")}`);
+}
+function editAccount(){
+  if(!me)return;
+  modal("Edit my account",field("Full name","name","text",me.name)+field("Email","email","email",me.email)+
+    optional("Current password (required to change password)","currentPassword","password")+
+    optional("New password (leave blank to keep existing)","newPassword","password")+
+    optional("Confirm new password","confirmPassword","password"),v=>{
+      const name=String(v.name||"").trim(),email=String(v.email||"").trim().toLowerCase();
+      if(name.length<2||!email.includes("@"))return toast("Enter a valid name and email.");
+      if(db.users.some(u=>u.id!==me.id&&u.email.toLowerCase()===email))return toast("Email is already in use.");
+      if(v.newPassword||v.currentPassword||v.confirmPassword){
+        if(v.currentPassword!==me.password)return toast("Current password is incorrect.");
+        if(String(v.newPassword||"").length<8||v.newPassword!==v.confirmPassword)return toast("New password must be at least 8 characters and match confirmation.");
+        me.password=v.newPassword;
+      }
+      me.name=name;me.email=email;
+      finish("Account updated");
+    },"Save account");
+}
+function editUser(id){
+  if(!role("admin"))return;
+  const u=user(id);if(!u)return;
+  modal("Edit user — "+u.name,field("Full name","name","text",u.name)+field("Email","email","email",u.email)+
+    select("Role","role",Object.entries(ROLES),u.role)+
+    optional("New password (leave blank to keep existing)","password","password"),v=>{
+      const name=String(v.name||"").trim(),email=String(v.email||"").trim().toLowerCase();
+      if(name.length<2||!email.includes("@")||!ROLES[v.role])return toast("Invalid user details.");
+      if(db.users.some(x=>x.id!==u.id&&x.email.toLowerCase()===email))return toast("Email is already in use.");
+      if(v.password&&v.password.length<8)return toast("New password must be at least 8 characters.");
+      if(u.id===me.id&&v.role!==u.role)return toast("You cannot change your own administrator role.");
+      u.name=name;u.email=email;u.role=v.role;
+      if(v.password)u.password=v.password;
+      notify(u.id,"Account updated","An administrator updated your account details.","notifications");
+      finish("User account updated");
+    },"Save user");
 }
 function toggleUser(id) {
   if(!role("admin")||id===me.id)return;
@@ -2034,7 +2083,7 @@ function handleAction(e) {
     rejectSupplier:()=>decideSupplier(id,false),
     newSupplierStatement,
     markSupplierPaid:()=>markSupplierPaid(id),
-    newFeedback,newUser,
+    newFeedback,newUser,editAccount,editUser:()=>editUser(id),
     toggleUser:()=>toggleUser(id),
     exportProjects, completionRecord:()=>completionRecord(id),reviewSupplier:()=>reviewSupplier(id),settingsEdit, downloadSupplierAgreement:()=>downloadSupplierFile(id,"agreementFile"),downloadSupplierSupport:()=>downloadSupplierFile(id,"supportFile")
   };
