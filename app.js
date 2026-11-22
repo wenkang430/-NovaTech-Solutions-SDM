@@ -1760,7 +1760,7 @@ function newUser() {
 }
 function renderAccount(){
   heading("Account Settings","Manage your own account details and password.",btn("Edit profile","editAccount"));
-  $("pageContent").innerHTML=panel("My account",`<p><strong>Name:</strong> ${esc(me.name)}</p><p><strong>Email:</strong> ${esc(me.email)}</p><p><strong>Role:</strong> ${esc(ROLES[me.role])}</p><p>Changes to your account are saved in this browser's local data.</p>${btn("Edit profile / password","editAccount")}`);
+$("pageContent").innerHTML=panel("My account",`<p><strong>Name:</strong> ${esc(me.name)}</p><p><strong>Email:</strong> ${esc(me.email)}</p><p><strong>Role:</strong> ${esc(ROLES[me.role])}</p>${btn("Edit profile / password","editAccount")}`);
 }
 function editAccount(){
   if(!me)return;
