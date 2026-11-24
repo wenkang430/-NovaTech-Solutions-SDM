@@ -303,6 +303,7 @@ function navigate(p) {
   page=p;closeSidebar();render();
 }
 function logout() {
+  taskView = "table";
   me=null;sessionStorage.removeItem(SESSION_KEY);
   $("loginForm").reset();
   closeSidebar();
@@ -871,6 +872,7 @@ function reviewProjectCancellation(id){
 
 /* TASKS AND MANAGER REVIEW */
 
+let taskView = "table";
 function renderTasks() {
   heading(role("manager")?"Team Tasks":"My Tasks",
     "Developer completion requires manager approval.",
@@ -898,8 +900,24 @@ function renderTasks() {
       `${n(t.progress)}%`,esc(t.due||"—"),t.reviewReason?`<span class="subtext">${esc(t.reviewReason)}</span>`:"—",btn("View","viewTask",t.id,"outline")+" "+action
     ];
   });
-  $("pageContent").innerHTML=panel("Task Register",
-    table(["Task","Developer","Status","Progress","Due","Manager Advice","Action"],rows));
+  const views = `<div class="task-view-switch" role="group" aria-label="Task view">
+    ${[ ["table","Table View"], ["board","Kanban Board"] ].map(([v,label])=>`<button type="button" class="btn ${taskView===v?"primary":"outline"}" data-action="taskView${v}" aria-pressed="${taskView===v}">${label}</button>`).join("")}</div>`;
+  $("pageContent").innerHTML=views+(taskView==="board"?panel("Kanban Board",renderTaskBoard(tasks,rows)):panel("Task Register",
+    table(["Task","Developer","Status","Progress","Due","Manager Advice","Action"],rows)));
+}
+function renderTaskBoard(tasks,rows) {
+  const statuses=["Pending","In Progress","Awaiting Manager Review","Completed"];
+  const extra=[...new Set(tasks.map(t=>String(t.status||"Unknown")))].filter(x=>!statuses.includes(x));
+  return `<div class="kb-scroll"><div class="kb-board" style="--kb-cols:${statuses.length+extra.length}">${[...statuses,...extra].map((status,i)=>{
+    const items=tasks.map((t,index)=>({t,index})).filter(({t})=>String(t.status||"Unknown")===status);
+    return `<section class="kb-column kb-stage-${Math.min(i,4)}"><div class="kb-heading"><h3>${esc(status)}</h3><span>${items.length}</span></div>${items.length?items.map(({t,index})=>{
+      const progress=Math.max(0,Math.min(100,n(t.progress)));
+      const late=t.due&&t.due<todayISO()&&!['Completed','Awaiting Manager Review'].includes(t.status);
+      return `<article class="kb-card"><small class="kb-project">${esc(pname(t.projectId))}</small><h3>${esc(t.title)}</h3><div>${badge(t.priority||"Medium")}${late?' <span class="badge danger">Overdue</span>':''}</div><div class="kb-meta"><span>Start: ${esc(t.start||"—")}</span><span>Due: ${esc(t.due||"—")}</span></div>${progressBarForTask(progress)}<div class="kb-person"><span class="avatar">${esc(initials(uname(t.assigneeId)))}</span>${esc(uname(t.assigneeId))}</div>${t.reviewReason?`<p class="kb-advice"><strong>Manager advice:</strong> ${esc(t.reviewReason)}</p>`:""}<div class="kb-actions">${rows[index][6]}</div></article>`;
+    }).join(""):'<div class="kb-empty">No tasks</div>'}</section>`;
+  }).join("")}</div></div><p class="kb-help">Cards move automatically when task status changes. Use the task actions to update or review work.</p>`;
+}
+function progressBarForTask(value){return progress(value);
 }
 function newTask() {
   if(!role("manager"))return;
@@ -2146,6 +2164,8 @@ function handleAction(e) {
     reviewProjectCancellation:()=>reviewProjectCancellation(id),
     acceptProject:()=>acceptProject(id),
     rejectProject:()=>rejectProject(id),
+    taskViewtable:()=>{if(page==="tasks"){taskView="table";renderTasks();}},
+    taskViewboard:()=>{if(page==="tasks"){taskView="board";renderTasks();}},
     newTask,
     editTask:()=>editTask(id),editTaskDates:()=>editTaskDates(id),viewTask:()=>viewTask(id),
     approveTask:()=>approveTask(id),
