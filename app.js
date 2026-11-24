@@ -437,6 +437,7 @@ function render() {
   me=db.users.find(u=>u.id===me.id&&u.active!==false)||null;
   if(!me){logout();return;}
   if(!allowed(page))page="overview";
+  meetingReminderScan();
 
   $("sideUserName").textContent=me.name;
   $("sideUserRole").textContent=ROLES[me.role];
@@ -1155,6 +1156,68 @@ function supplierStopService(id) {
 
 /* MEETINGS */
 
+// Meeting reminders use browser-local time, and persist per recipient and window.
+function meetingReminderScan(now = Date.now()) {
+  let changed = false;
+  const alerts = [];
+  for (const m of db.meetings) {
+    if (m.status !== 'Scheduled') continue;
+    const start = new Date(`${m.date}T${m.time}`).getTime();
+    const remaining = start - now;
+    if (!Number.isFinite(start) || remaining <= 0 || remaining > 86400000) continue;
+    const window = remaining <= 1800000 ? '30m' : '24h';
+    const recipients = new Set([m.createdBy, ...db.meetingInvitations.filter(i=>i.meetingId===m.id && ['Pending','Accepted'].includes(i.status)).map(i=>i.userId)]);
+    m.reminderLog ||= {};
+    for (const uid of recipients) {
+      if (!user(uid) || user(uid).active===false) continue;
+      const key = `${uid}:${m.date}:${m.time}:${window}`;
+      if (m.reminderLog[key]) continue;
+      m.reminderLog[key] = true;
+      if (window === '30m') m.reminderLog[`${uid}:${m.date}:${m.time}:24h`] = true;
+      const message = `${m.title} starts in ${window==='30m'?'30 minutes or less':'24 hours or less'} (${m.date} at ${m.time}).`;
+      notify(uid,'Meeting reminder',message,'meetings');
+      if (uid===me?.id) alerts.push(message);
+      changed = true;
+    }
+  }
+  if (changed) saveData(db);
+  if (alerts.length) toast(alerts.length===1?alerts[0]:`You have ${alerts.length} upcoming meeting reminders. Check Notifications.`);
+  return changed;
+}
+function upcomingMeetingNotice() {
+  const now=Date.now();
+  const upcoming=db.meetings.filter(m=>m.status==='Scheduled' && (m.createdBy===me.id || db.meetingInvitations.some(i=>i.meetingId===m.id && i.userId===me.id && ['Accepted','Pending'].includes(i.status))))
+    .filter(m=>{const t=new Date(`${m.date}T${m.time}`).getTime();return t>now && t-now<=86400000;})
+    .sort((a,b)=>`${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+  return upcoming.length?`<div class="notice warning"><strong>Upcoming meetings in the next 24 hours</strong>${upcoming.map(m=>`<div>${esc(m.title)} · ${esc(m.date)} at ${esc(m.time)} ${btn('View','viewMeeting',m.id,'outline')}</div>`).join('')}</div>`:'';
+}
+let meetingMonth = null;
+function meetingCalendar() {
+  const today = todayISO();
+  if (!meetingMonth) meetingMonth = today.slice(0,7);
+  const [year,month] = meetingMonth.split('-').map(Number);
+  const first = new Date(year,month-1,1);
+  const offset = (first.getDay()+6)%7;
+  const days = new Date(year,month,0).getDate();
+  const meetings = db.meetings.filter(canMeeting).filter(m=>m.date?.startsWith(meetingMonth)).sort((a,b)=>String(a.time).localeCompare(String(b.time)));
+  const cells = Array.from({length:Math.ceil((offset+days)/7)*7},(_,i)=>{
+    const day=i-offset+1;
+    if(day<1||day>days)return '<div class="mc-day mc-blank" aria-hidden="true"></div>';
+    const date=meetingMonth+'-'+String(day).padStart(2,'0');
+    return `<div class="mc-day ${date===today?'mc-today':''}"><span class="mc-number">${day}</span>${meetings.filter(m=>m.date===date).map(m=>{
+      const kind=m.status==='Scheduled'?'scheduled':m.status==='Completed'?'completed':'closed';
+      return `<button type="button" class="mc-event ${kind}" data-action="viewMeeting" data-id="${Number(m.id)}" title="${esc(m.title+' · '+m.status)}"><small>${esc(m.time||'')} · ${esc(m.status)}</small><strong>${esc(m.title)}</strong></button>`;
+    }).join('')}</div>`;
+  }).join('');
+  return `<div class="mc-toolbar"><div><h3>${first.toLocaleDateString('en-MY',{month:'long',year:'numeric'})}</h3><span class="muted">${meetings.length} meeting(s) this month</span></div><div class="mc-controls"><button type="button" class="btn outline small" id="mcPrev" aria-label="Previous month">‹</button><button type="button" class="btn outline small" id="mcToday">Today</button><button type="button" class="btn outline small" id="mcNext" aria-label="Next month">›</button></div></div><div class="mc-legend"><span>Scheduled</span><span>Completed</span><span>Cancelled / closed</span></div><div class="mc-scroll"><div class="mc-grid">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="mc-weekday">${d}</div>`).join('')}${cells}</div></div><p class="muted mc-help">Select a meeting to view its details. On small screens, scroll horizontally.</p>`;
+}
+function bindMeetingCalendar(){
+  const move=delta=>{const [y,m]=meetingMonth.split('-').map(Number);const d=new Date(y,m-1+delta,1);meetingMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');renderMeetings();};
+  $('mcPrev').onclick=()=>move(-1);
+  $('mcNext').onclick=()=>move(1);
+  $('mcToday').onclick=()=>{meetingMonth=todayISO().slice(0,7);renderMeetings();};
+}
+
 function renderMeetings() {
   heading("Meetings","Invitations, attendance and rejection reasons.",
     role("client","manager")?btn("+ Schedule Meeting","newMeeting"):"");
@@ -1181,9 +1244,10 @@ function renderMeetings() {
       badge(inv?.status|| (m.createdBy===me.id?"Organizer":"—")),esc(inv?.reason||"—"),esc(m.cancelReason||"—"),badge(m.status),btn("View","viewMeeting",m.id,"outline")+" "+action
     ];
   });
-  $("pageContent").innerHTML=panel("Meeting Schedule",
+  $("pageContent").innerHTML=upcomingMeetingNotice()+panel("Meeting Calendar",meetingCalendar())+panel("Meeting Schedule",
     table(["Meeting","Project","Scheduled By","When",
       "Participant Responses","My RSVP","My Decline Reason","Cancellation Reason","Status","Action"],rows));
+  bindMeetingCalendar();
 }
 function newMeeting() {
   if(!role("client","manager"))return;
@@ -2128,10 +2192,28 @@ async function supplierFile(f){if(!f||f.type!=='application/pdf'||!f.size||f.siz
 function downloadSupplierFile(id,key){const s=supplier(id);if(!s||!role('admin')&&s.userId!==me.id)return;const f=s[key];if(!f)return toast('No file uploaded');const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();}
 function reviewSupplier(id){const s=supplier(id);if(!role('admin')||!s||s.status!=='Pending Approval')return;modal('Review supplier agreement',`<p>${esc(s.company)} — ${esc(s.agreement)}</p><p>${esc(s.agreementFile?.name||'Missing agreement')} ${btn('Download agreement','downloadSupplierAgreement',id,'outline')}</p><p>${esc(s.supportFile?.name||'Missing supporting document')} ${btn('Download supporting document','downloadSupplierSupport',id,'outline')}</p><p>Enter the partnership service charge percentage stated in the signed agreement. Enter 0 only when the agreement explicitly specifies no charge. This percentage is deducted from gross supplier service fees when new monthly statements are generated.</p>${field('Agreed partnership charge (%)','charge','number',s.serviceChargePercent??'','min="0" max="100" step="0.01"')}<label><input type="checkbox" name="reviewed" required> I verified both documents, the service rate, and the partnership charge against the agreement.</label>`,v=>{if(!s.agreementFile||!s.supportFile||!v.reviewed)return toast('Both documents and confirmation are required.');const pct=Number(v.charge);if(!Number.isFinite(pct)||pct<0||pct>100||v.charge==='')return toast('Enter a valid agreed percentage from 0 to 100.');s.serviceChargePercent=pct;s.chargeConfirmed=true;s.reviewedFiles=true;finish('Documents and partnership charge reviewed');},'Confirm review');}
 function completionRecord(id){const p=project(id);if(!p||!canProject(id)||p.status!=='Accepted')return;const invoices=db.payments.filter(x=>x.projectId===id),paid=invoices.filter(x=>x.status==='Paid').reduce((s,x)=>s+n(x.amount),0);modal('Final project completion record',`<h3>${esc(p.title)}</h3><p>Reference: ${esc(p.reference)}</p><p>Client: ${esc(uname(p.clientId))}</p><p>Accepted: ${esc(p.acceptedDate)}</p><p>Approved budget: ${money(p.budget)}</p><p>Verified payments: ${money(paid)}</p><p>Outstanding: ${money(Math.max(0,p.budget-paid))}</p><p>Completed tasks: ${db.tasks.filter(t=>t.projectId===id&&t.status==='Completed').length}</p><button type="button" class="btn" onclick="window.print()">Print record</button>`,()=>closeModal(),'Close');}
-function renderSchedule(){heading('Project Schedule','Task dates, dependencies and delivery timeline.',role('manager')?btn('+ Assign Task','newTask'):'');const tasks=db.tasks.filter(t=>canProject(t.projectId));const dates=tasks.flatMap(t=>[t.start||todayISO(),t.due||todayISO()]).sort();const min=Date.parse(dates[0]||todayISO()),max=Math.max(min+86400000,Date.parse(dates.at(-1)||todayISO())+86400000);$('pageContent').innerHTML=panel('Timeline — '+esc(dates[0]||todayISO())+' to '+esc(dates.at(-1)||todayISO()),table(['Task / Project','Assigned to','Start','End','Predecessor','Timeline','Status'],tasks.map(t=>{const left=Math.max(0,(Date.parse(t.start||todayISO())-min)/(max-min)*100),width=Math.max(2,(Date.parse(t.due||todayISO())+86400000-Date.parse(t.start||todayISO()))/(max-min)*100);return [esc(t.title)+'<span class="subtext">'+esc(pname(t.projectId))+'</span>',esc(uname(t.assigneeId)),esc(t.start||'Not set'),esc(t.due),esc(db.tasks.find(x=>x.id===t.predecessor)?.title||'None'),`<div class="schedule-track"><i style="left:${left}%;width:${Math.min(100-left,width)}%"></i></div>`,badge(t.status)];})));}
+let ganttProject = '';
+function ganttChart(projectId) {
+ const day=86400000, parse=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')?Date.parse(s):NaN;
+ const items=[...db.tasks.filter(t=>canProject(t.projectId)&&(!projectId||String(t.projectId)===projectId)).map(t=>({title:t.title,projectId:t.projectId,start:t.start,end:t.due,status:t.status,progress:t.progress,detail:uname(t.assigneeId)})),...db.milestones.filter(m=>canProject(m.projectId)&&(!projectId||String(m.projectId)===projectId)).map(m=>({title:m.title,projectId:m.projectId,start:m.dueDate,end:m.dueDate,status:m.status,milestone:true,detail:'Milestone'}))].map(t=>({...t,a:parse(t.start),b:parse(t.end)})).filter(t=>Number.isFinite(t.a)&&Number.isFinite(t.b)&&t.b>=t.a).sort((a,b)=>a.a-b.a);
+ if(!items.length)return empty('No scheduled items','Add tasks with start and due dates or create milestones to populate the Gantt chart.');
+ const min=Math.min(...items.map(t=>t.a)),max=Math.max(...items.map(t=>t.b))+day,span=(max-min)/day,step=span<=21?1:span<=120?7:Math.ceil(span/12),cols=Math.ceil(span/step),width=Math.max(650,cols*65),today=parse(todayISO());
+ const pct=d=>(d-min)/(max-min)*100,fmt=d=>new Date(d).toISOString().slice(0,10),marker=today>=min&&today<max?`<i class="gantt-today" style="left:${pct(today)}%"></i>`:'';
+ const ticks=Array.from({length:cols},(_,i)=>`<span style="left:${pct(min+i*step*day)}%">${fmt(min+i*step*day).slice(5)}</span>`).join('');
+ const grid=Array.from({length:cols},(_,i)=>`<i class="gantt-gridline" style="left:${pct(min+i*step*day)}%"></i>`).join('');
+ return `<div class="gantt-legend"><span>🟣 In progress</span><span>🟢 Completed</span><span>⚪ Pending / other</span><span>🔴 Overdue</span><span>◆ Milestone</span><span>│ Today (when in range)</span></div><p class="muted">${fmt(min)} to ${fmt(max-day)} · Dates in MM-DD · Scroll horizontally to view timeline.</p><div class="gantt-scroll"><div class="gantt-table" style="--timeline-width:${width}px"><div class="gantt-row gantt-head"><div>Task / Milestone</div><div class="gantt-axis">${ticks}${marker}</div></div>${items.map(t=>{const done=t.status==='Completed',overdue=!done&&!['Closed','Cancelled'].includes(t.status)&&t.b<today,kind=done?'done':overdue?'late':t.status==='In Progress'?'doing':'pending',p=done?100:Math.max(0,Math.min(100,Number(t.progress)||0)),label=esc(`${t.title} | ${fmt(t.a)} to ${fmt(t.b)} | ${t.status}${t.milestone?'':` | ${p}%`}`);return `<div class="gantt-row"><div class="gantt-name"><strong>${esc(t.title)}</strong><small>${esc(pname(t.projectId))} · ${esc(t.detail)} · ${esc(t.status)}${t.milestone?'':` · ${p}%`}</small></div><div class="gantt-axis">${grid}${t.milestone?`<span class="gantt-diamond ${kind}" style="left:${pct(t.a+day/2)}%" title="${label}" aria-label="${label}"></span>`:`<span class="gantt-bar ${kind}" style="left:${pct(t.a)}%;width:${pct(t.b+day)-pct(t.a)}%" title="${label}" aria-label="${label}"><i style="width:${p}%"></i></span>`}${marker}</div></div>`;}).join('')}</div></div>`;
+}
+function renderSchedule(){
+ heading('Project Schedule','Task dates, dependencies and delivery timeline.',role('manager')?btn('+ Assign Task','newTask'):'');
+ const ps=ownProjects();if(!ps.some(p=>String(p.id)===ganttProject))ganttProject='';
+ const tasks=db.tasks.filter(t=>canProject(t.projectId)&&(!ganttProject||String(t.projectId)===ganttProject));
+ $('pageContent').innerHTML=panel('Project Gantt Chart',`<label class="gantt-filter">Project<select id="ganttProject"><option value="">All projects</option>${ps.map(p=>`<option value="${p.id}" ${String(p.id)===ganttProject?'selected':''}>${esc(p.title)}</option>`).join('')}</select></label>${ganttChart(ganttProject)}`)+panel('Task Schedule',table(['Task / Project','Assigned to','Start','End','Predecessor','Status'],tasks.map(t=>[esc(t.title)+'<span class="subtext">'+esc(pname(t.projectId))+'</span>',esc(uname(t.assigneeId)),esc(t.start||'Not set'),esc(t.due),esc(db.tasks.find(x=>x.id===t.predecessor)?.title||'None'),badge(t.status)])));
+ $('ganttProject').onchange=e=>{ganttProject=e.target.value;renderSchedule();};
+}
+
 function renderSettings(){if(!role('admin'))return;heading('System Settings','Configure workspace preferences and optional module access.',btn('Edit settings','settingsEdit'));$('pageContent').innerHTML=panel('Workspace',`<p>Company: ${esc(db.settings?.company||'NovaTech Solutions')}</p><p>Support contact: ${esc(db.settings?.support||'Not set')}</p><p>Testing clock: ${db.settings?.testMode?esc(db.settings.testDate)+' (SIMULATED)':'Real date'}</p>`)+panel('Role permissions',table(['Role','Disabled modules'],Object.entries(ROLES).map(([k,v])=>[esc(v),esc((db.settings?.disabled?.[k]||[]).join(', ')||'None')])));}
 function settingsEdit(){if(!role('admin'))return;modal('System settings',field('Company name','company','text',db.settings?.company||'NovaTech Solutions')+optional('Support email','support','email',db.settings?.support||'')+`<fieldset><legend>Prototype testing clock (admin only)</legend><label><input type="checkbox" name="testMode" ${db.settings?.testMode?'checked':''}> Enable simulated date for testing</label>`+optional('Simulated date','testDate','date',db.settings?.testDate||todayISO())+`<p>For UAT only. Restore the real date when finished.</p></fieldset>`+Object.entries(MENUS).filter(([k])=>k!=='admin').map(([k,items])=>`<fieldset><legend>${esc(ROLES[k])}: disable optional pages</legend>${items.filter(([x])=>!['overview','notifications'].includes(x)).map(([x,l])=>`<label><input type="checkbox" name="${k}_${x}" ${(db.settings?.disabled?.[k]||[]).includes(x)?'checked':''}> ${esc(l)}</label>`).join('')}</fieldset>`).join(''),v=>{const disabled={};for(const [k,items] of Object.entries(MENUS))if(k!=='admin')disabled[k]=items.filter(([x])=>v[k+'_'+x]).map(([x])=>x);db.settings={company:v.company,support:v.support,disabled,testDate:v.testDate||'',testMode:!!v.testMode};finish('Settings saved');});}
 setupAuth();
 $('modalBody').addEventListener('click',handleAction);
-setInterval(()=>{if(!me||modalAction)return;db=loadData();const changed=expireProposals(),billed=generateDueStatements();if(changed||billed){saveData(db);render();}},60000);
+setInterval(()=>{if(!me||modalAction)return;db=loadData();const changed=expireProposals(),billed=generateDueStatements();const reminded=meetingReminderScan();if(changed||billed||reminded){saveData(db);render();}},60000);
 
