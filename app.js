@@ -1,5 +1,36 @@
 
 "use strict";
+// Local SVG navigation icons; no external icon library required.
+const NAV_ICONS = {
+  "overview": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/>",
+  "notifications": "<path d=\"M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4\"/>",
+  "requests": "<rect x=\"5\" y=\"4\" width=\"14\" height=\"17\" rx=\"2\"/><rect x=\"9\" y=\"2\" width=\"6\" height=\"4\" rx=\"1\"/><path d=\"M9 10h6M9 14h6M9 18h4\"/>",
+  "proposals": "<path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 15l3 3 5-5\"/>",
+  "projects": "<path d=\"M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8 11v6M12 11v3M16 11v5\"/>",
+  "milestones": "<path d=\"M5 22V3m0 1c5-5 9 4 15 0v12c-6 4-10-5-15 0\"/>",
+  "messages": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"m3 7 9 6 9-6\"/>",
+  "changes": "<circle cx=\"6\" cy=\"5\" r=\"2\"/><circle cx=\"6\" cy=\"19\" r=\"2\"/><circle cx=\"18\" cy=\"19\" r=\"2\"/><path d=\"M6 7v10M18 17V8l-4-4m0 4V4h4\"/>",
+  "meetings": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M16 3v4M8 3v4M3 10h18M8 14h2m4 0h2m-8 3h2\"/>",
+  "documents": "<path d=\"M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v2M3 7v12a2 2 0 0 0 2 2h13l4-11H7L3 19\"/>",
+  "payments": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"15\" rx=\"2\"/><path d=\"M3 8V5l14-3v3M16 11h5v5h-5a2.5 2.5 0 0 1 0-5z\"/>",
+  "feedback": "<path d=\"M21 11a8 8 0 0 1-8 8H8l-5 3v-7a8 8 0 0 1 8-12h2a8 8 0 0 1 8 8zM8 10h8M8 14h5\"/>",
+  "tasks": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"3\"/><path d=\"m7 12 3 3 7-7\"/>",
+  "schedule": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M8 3v4M16 3v4M3 10h18M7 14h10M7 17h6\"/>",
+  "issues": "<path d=\"M12 3 2 20h20L12 3zM12 9v5M12 17h.01\"/>",
+  "staff": "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M21 21v-3a5 5 0 0 0-4-5\"/>",
+  "supplierAssignments": "<rect x=\"2\" y=\"5\" width=\"20\" height=\"15\" rx=\"2\"/><path d=\"M8 5V3h8v2M2 11h20M10 11v3h4v-3\"/>",
+  "reports": "<path d=\"M3 3v18h18M7 16v-4M12 16V7M17 16V4\"/>",
+  "supplierPayments": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8M12 6v12\"/>",
+  "registration": "<path d=\"M3 21h18M5 21V3h14v18M9 7h1m4 0h1M9 11h1m4 0h1M10 21v-5h4v5\"/>",
+  "suppliers": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><circle cx=\"12\" cy=\"9\" r=\"3\"/><path d=\"M6 18a6 6 0 0 1 12 0\"/>",
+  "users": "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 21v-3a6 6 0 0 1 12 0v3M17 7h4M19 5v4\"/>",
+  "settings": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"m10 2-.6 3-2 .9-2.6-1.5-2.4 4.2 2.5 1.8v3.2l-2.5 1.8 2.4 4.2 2.6-1.5 2 .9.6 3h4l.6-3 2-.9 2.6 1.5 2.4-4.2-2.5-1.8v-3.2l2.5-1.8-2.4-4.2-2.6 1.5-2-.9L14 2z\"/>",
+  "account": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21v-2a8 8 0 0 1 16 0v2\"/>"
+};
+function navIcon(key) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${NAV_ICONS[key] || NAV_ICONS.overview}</svg>`;
+}
+
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({
@@ -418,7 +449,7 @@ function render() {
   const count=unread();
   $("sideNav").innerHTML=MENUS[me.role].filter(([key])=>allowed(key)).map(([key,label,icon])=>
     `<button class="nav-item ${page===key?"active":""}" data-page="${key}">
-      <span class="nav-icon">${icon}</span>${esc(label)}
+      <span class="nav-icon" aria-hidden="true">${navIcon(key)}</span>${esc(label)}
       ${key==="notifications"&&count?
         `<span class="badge warning" style="margin-left:auto">${count}</span>`:""}
     </button>`).join("");
